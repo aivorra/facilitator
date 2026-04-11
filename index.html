@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilitator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="logo-container">
+            <img src="logo.png" alt="Logo" class="logo-img"
+                onerror="this.style.display='none'; document.getElementById('logo-placeholder').style.display='flex';">
+            <div id="logo-placeholder" class="logo-placeholder" style="display:none;">F</div>
+            <h2>Facilitator<span id="header-domain-display"
+                    style="font-weight: 400; color: var(--secondary); font-size: 16px; margin-left: 5px;"></span></h2>
+        </div>
+        <div class="header-actions" style="align-items: center;">
+            <button id="btn-theme-toggle" class="btn btn-text" style="padding: 8px; border-radius: 50%;"
+                title="Alternar Tema"><i data-lucide="moon" class="icon-sm"></i></button>
+            <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 10px;"></div>
+            <button id="btn-toggle-edit" class="btn btn-secondary" title="Modo Edición"><i data-lucide="pencil"
+                    class="icon-sm"></i></button>
+            <button id="btn-add-host" class="btn btn-success edit-only" style="display:none;"
+                title="Añadir Nuevo Host"><i data-lucide="plus" class="icon-sm"></i> Nuevo Host</button>
+            <button id="btn-settings" class="btn btn-secondary" title="Configuración General"><i data-lucide="settings"
+                    class="icon-sm"></i></button>
+            <button id="btn-export" class="btn btn-secondary" title="Exportar Configuración"><i data-lucide="download"
+                    class="icon-sm"></i></button>
+            <label for="input-import" class="btn btn-secondary"
+                style="cursor:pointer; margin: 0; display: inline-flex; align-items: center; justify-content: center;"
+                title="Importar Configuración">
+                <i data-lucide="upload" class="icon-sm"></i>
+                <input type="file" id="input-import" accept=".json" style="display:none;">
+            </label>
+        </div>
+    </header>
+
+    <main class="main-layout">
+        <div class="workspace">
+            <div class="search-bar">
+                <input type="text" id="buscador" placeholder="Buscar host..." autocomplete="off">
+                <button id="btn-clear-search" class="btn btn-text">Limpiar</button>
+            </div>
+
+            <div class="url-preview">
+                <input type="text" id="url-display" readonly placeholder="Selecciona un Host y un Servicio"
+                    autocomplete="off">
+                <button id="btn-open-url" class="btn btn-primary" disabled>Abrir Web</button>
+            </div>
+
+            <div class="columns-container" id="hosts-container">
+                <!-- Columns will be injected by JS -->
+            </div>
+
+
+
+
+        </div>
+
+        <aside class="sidebar-notas">
+            <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <i data-lucide="info"></i> Información Importante
+                <button id="btn-add-nota" class="btn btn-sm btn-success edit-only"
+                    style="display:none; margin-left:auto;" title="Añadir Nota"><i data-lucide="plus"
+                        class="icon-sm"></i></button>
+            </h3>
+            <div id="notas-container" style="display: flex; flex-direction: column; gap: 15px;">
+                <!-- Notas will be injected by JS -->
+            </div>
+        </aside>
+    </main>
+
+    <footer class="app-footer">
+        <p>Versión 2.0 | Agustin Ivorra</p>
+    </footer>
+
+    <!-- Modals -->
+    <div id="modal-services-selection" class="modal">
+        <div class="modal-content" style="max-width: 500px; position: relative;">
+            <button type="button" class="btn btn-text"
+                style="position: absolute; top: 15px; right: 15px; padding: 6px; border-radius: 50%; display: flex;"
+                onclick="closeModal('modal-services-selection'); window.selectedService=null; actualizarUrl(); renderHosts();"
+                title="Cerrar">
+                <i data-lucide="x" class="icon-sm"></i>
+            </button>
+            <div class="services-header"
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid var(--border-color); padding-right: 30px;">
+                <h3 style="margin:0; font-size: 18px;">Servicios para <span id="selected-host-name"
+                        style="color: var(--primary);"></span></h3>
+
+            </div>
+            <div id="services-list" class="buttons-grid" style="max-height: 50vh; overflow-y: auto;">
+                <!-- Services will be injected by JS -->
+            </div>
+        </div>
+    </div>
+    <div id="modal-host" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-host-title">Añadir Host</h3>
+            <form id="form-host">
+                <input type="hidden" id="host-id">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="host-name" required>
+                </div>
+                <div class="form-group">
+                    <label>IP / Hostname</label>
+                    <input type="text" id="host-ip" required>
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap: 8px;">
+                    <input type="checkbox" id="host-use-domain" style="width:auto; margin-bottom:0;">
+                    <label for="host-use-domain" style="margin-bottom:0; cursor:pointer;">Dominio Global</label>
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="host-type" required>
+                        <option value="application">Application</option>
+                        <option value="server">Server</option>
+                        <option value="networking">Networking</option>
+                        <option value="base_station">Base Station</option>
+                    </select>
+                </div>
+                <div class="form-group"
+                    style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                    <label
+                        style="color: var(--primary); display:flex; justify-content:space-between; align-items:center;">
+                        Servicios del Host
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addHostServiceRow('', '')"><i
+                                data-lucide="plus" class="icon-sm"></i></button>
+                    </label>
+                    <div id="host-services-container">
+                        <!-- Dynamic rows injected here -->
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text" onclick="closeModal('modal-host')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Service modal removed as services are now managed inside the Host modal -->
+
+    <div id="modal-nota" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-nota-title">Añadir Nota</h3>
+            <form id="form-nota">
+                <input type="hidden" id="nota-id">
+                <div class="form-group">
+                    <label>Contenido de la nota (Muestra texto y acepta HTML intermedio)</label>
+                    <textarea id="nota-texto" required
+                        style="width:100%; min-height:80px; padding:10px; border: 1px solid var(--border-color); border-radius:4px; font-family:inherit; resize:vertical;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text" onclick="closeModal('modal-nota')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal">
+        <div class="modal-content">
+            <h3>Configuración General</h3>
+            <form id="form-settings">
+                <div class="form-group">
+                    <label>Dominio Predeterminado</label>
+                    <input type="text" id="settings-domain" placeholder="Ej: .inte1.int">
+                    <small style="color: gray; display: block; margin-top: 8px; font-size: 12px; line-height: 1.4;">Este
+                        sufijo se añadirá si el checkbox <b>Dimminio Global</b> está seleccionado.</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text" onclick="closeModal('modal-settings')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
