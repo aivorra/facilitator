@@ -2,6 +2,12 @@
 
 **Facilitator** es un dashboard administrativo ligero y portátil diseñado para centralizar y agilizar el acceso a diferentes recursos de red, servidores y servicios web. Funciona como un "hub" dinámico que permite a los administradores de sistemas y operadores de red organizar, documentar y acceder en un solo clic a la infraestructura tecnológica y plataformas de monitoreo.
 
+## 📸 Capturas de Pantalla
+
+![Vista Principal](img/main.png)
+![Servicios](img/services.png)
+![Modo Oscuro](img/darkmode.png)
+
 ## 🚀 Características Principales
 
 *   **Gestión Centralizada de Hosts:** Organiza tus recursos en diferentes categorías (*Applications, Servers, Networking, Base Stations*).
