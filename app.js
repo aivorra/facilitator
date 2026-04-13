@@ -556,8 +556,10 @@ function updateHeaderDomain() {
     const display = document.getElementById('header-domain-display');
     if (state.domain && state.domain.trim() !== '') {
         display.textContent = `- ${state.domain}`;
+        document.title = `Facilitator - ${state.domain}`;
     } else {
         display.textContent = '';
+        document.title = 'Facilitator';
     }
 }
 
