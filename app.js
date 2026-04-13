@@ -153,8 +153,8 @@ function renderHosts(filtro = "") {
 
     // Preparar columnas
     const columns = {
-        'application': { title: 'Applications', types: ['application', 'service'], html: '' },
-        'server': { title: 'Servers', types: ['server'], html: '' },
+        'application': { title: 'Application', types: ['application', 'service'], html: '' },
+        'server': { title: 'Server', types: ['server'], html: '' },
         'networking': { title: 'Networking', types: ['networking'], html: '' },
         'base_station': { title: 'Base Station', types: ['base_station'], html: '' }
     };

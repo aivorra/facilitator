@@ -10,7 +10,7 @@
 
 ## 🚀 Características Principales
 
-*   **Gestión Centralizada de Hosts:** Organiza tus recursos en diferentes categorías (*Applications, Servers, Networking, Base Stations*).
+*   **Gestión Centralizada de Hosts:** Organiza tus recursos en diferentes categorías (*Application, Server, Networking, Base Stations*).
 *   **Servicios Multi-Host:** A diferencia de un simple marcador de URLs, cada Host puede tener configurados múltiples servicios internos de forma granular (selección de protocolo HTTP/HTTPS, nombres personalizados y puertos específicos).
 *   **Modo Edición Integrado:** Interfaz intuitiva para añadir, editar o eliminar hosts y servicios directamente desde la web, sin tocar código.
 *   **Panel de Notas (Drag & Drop):** Una barra lateral flotante para guardar recordatorios, credenciales genéricas o información crítica. Las notas aceptan etiquetas HTML ligeras y pueden reordenarse fácilmente arrastrándolas.
