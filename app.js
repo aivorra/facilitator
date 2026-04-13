@@ -57,6 +57,29 @@ function loadData() {
                 saveData();
             }
 
+            if (!state.migratedToNetworks) {
+                const defaultRedId = 'red_default_' + Date.now();
+                state.redes = [
+                    { id: defaultRedId, nombre: 'Red Local', domain: state.domain || DEFAULT_DOMAIN }
+                ];
+                state.activeRedId = defaultRedId;
+
+                if (state.hosts) {
+                    state.hosts.forEach(h => h.redId = defaultRedId);
+                }
+                if (state.notas) {
+                    state.notas.forEach(n => n.redId = defaultRedId);
+                }
+
+                state.migratedToNetworks = true;
+                saveData();
+            }
+            if (!state.activeRedId && state.redes && state.redes.length > 0) {
+                state.activeRedId = state.redes[0].id;
+                saveData();
+            }
+
+
             if (!state.notas || state.notas.length === 0) {
                 state.notas = JSON.parse(JSON.stringify(defaultNotas));
                 saveData();
@@ -90,7 +113,9 @@ function renderNotas() {
     const container = document.getElementById('notas-container');
     container.innerHTML = "";
 
-    state.notas.forEach((nota, index) => {
+    const filteredNotas = state.notas.filter(n => n.redId === state.activeRedId);
+    filteredNotas.forEach((nota, idx) => {
+        const index = state.notas.indexOf(nota);
         const div = document.createElement('div');
         div.className = 'card-nota';
         if (editMode) div.setAttribute('draggable', 'true');
@@ -147,19 +172,21 @@ function renderNotas() {
     if (window.lucide) lucide.createIcons();
 }
 
+let draggedHostIndex = null;
+
 function renderHosts(filtro = "") {
     const container = document.getElementById('hosts-container');
     container.innerHTML = "";
 
     // Preparar columnas
     const columns = {
-        'application': { title: 'Application', types: ['application', 'service'], html: '' },
-        'server': { title: 'Server', types: ['server'], html: '' },
-        'networking': { title: 'Networking', types: ['networking'], html: '' },
-        'base_station': { title: 'Base Station', types: ['base_station'], html: '' }
+        'application': { title: 'Application', types: ['application', 'service'], elements: [] },
+        'server': { title: 'Server', types: ['server'], elements: [] },
+        'networking': { title: 'Networking', types: ['networking'], elements: [] },
+        'base_station': { title: 'Base Station', types: ['base_station'], elements: [] }
     };
 
-    const filteredHosts = state.hosts.filter(h => h.nombre.toLowerCase().includes(filtro.toLowerCase()));
+    const filteredHosts = state.hosts.filter(h => h.nombre.toLowerCase().includes(filtro.toLowerCase()) && h.redId === state.activeRedId);
 
     filteredHosts.forEach(host => {
         let colKey = null;
@@ -171,24 +198,79 @@ function renderHosts(filtro = "") {
         }
         if (!colKey) colKey = 'application'; // fallback
 
+        const indexInGlobal = state.hosts.indexOf(host);
         const isSelected = selectedHost && selectedHost.id === host.id ? 'selected' : '';
 
-        columns[colKey].html += `
-            <div class="item-wrapper">
-                <button class="host-btn cat-${host.tipo} ${isSelected}" onclick="seleccionarHost('${host.id}')">
-                    ${host.nombre}
-                </button>
-                <button class="btn-action edit-only" onclick="editarHost('${host.id}')" title="Editar"><i data-lucide="pencil" class="icon-sm"></i></button>
-                <button class="btn-action delete edit-only" onclick="borrarHost('${host.id}')" title="Eliminar"><i data-lucide="trash-2" class="icon-sm"></i></button>
-            </div>
+        const div = document.createElement('div');
+        div.className = 'item-wrapper';
+        if (editMode && filtro === "") {
+            div.setAttribute('draggable', 'true');
+        }
+
+        div.innerHTML = `
+            ${editMode && filtro === "" ? '<div class="drag-handle" style="display:flex; align-items:center; cursor:grab; color:var(--text-secondary);"><i data-lucide="grip-vertical" class="icon-sm"></i></div>' : ''}
+            <button class="host-btn cat-${host.tipo} ${isSelected}" onclick="seleccionarHost('${host.id}')" style="flex:1;">
+                ${host.nombre}
+            </button>
+            <button class="btn-action edit-only" onclick="editarHost('${host.id}')" title="Editar"><i data-lucide="pencil" class="icon-sm"></i></button>
+            <button class="btn-action delete edit-only" onclick="borrarHost('${host.id}')" title="Eliminar"><i data-lucide="trash-2" class="icon-sm"></i></button>
         `;
+
+        if (editMode && filtro === "") {
+            div.addEventListener('dragstart', (e) => {
+                draggedHostIndex = indexInGlobal;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => div.classList.add('dragging'), 0);
+            });
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+                draggedHostIndex = null;
+                renderHosts(filtro);
+            });
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            div.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                if (draggedHostIndex !== null && indexInGlobal !== draggedHostIndex) {
+                    div.style.borderTop = "3px dashed var(--primary)";
+                }
+            });
+            div.addEventListener('dragleave', (e) => {
+                div.style.borderTop = "";
+            });
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.style.borderTop = "";
+                if (draggedHostIndex !== null && draggedHostIndex !== indexInGlobal) {
+                    const item = state.hosts.splice(draggedHostIndex, 1)[0];
+                    let dropIndex = state.hosts.indexOf(host);
+                    if (dropIndex === -1) dropIndex = state.hosts.length;
+                    
+                    state.hosts.splice(dropIndex, 0, item);
+                    saveData();
+                    renderHosts(filtro);
+                }
+            });
+        }
+
+        columns[colKey].elements.push(div);
     });
 
     for (let key in columns) {
-        if (columns[key].html) {
+        if (columns[key].elements.length > 0) {
             const colDiv = document.createElement('div');
             colDiv.className = 'column';
-            colDiv.innerHTML = `<h3>${columns[key].title}</h3><div class="buttons-grid">${columns[key].html}</div>`;
+            const h3 = document.createElement('h3');
+            h3.textContent = columns[key].title;
+            colDiv.appendChild(h3);
+            
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'buttons-grid';
+            columns[key].elements.forEach(el => gridDiv.appendChild(el));
+            
+            colDiv.appendChild(gridDiv);
             container.appendChild(colDiv);
         }
     }
@@ -280,9 +362,10 @@ function actualizarUrl() {
 
     let hostFull = selectedHost.ip;
     let useDomain = selectedHost.usarDominio !== undefined ? selectedHost.usarDominio : !/^\d{1,3}(\.\d{1,3}){3}$/.test(selectedHost.ip);
+    const currentRed = state.redes ? state.redes.find(r => r.id === selectedHost.redId) : null;
 
-    if (useDomain && state.domain) {
-        hostFull += state.domain;
+    if (useDomain && currentRed && currentRed.domain) {
+        hostFull += currentRed.domain;
     }
 
     const prot = selectedService.protocolo || 'https';
@@ -325,6 +408,7 @@ document.getElementById('btn-toggle-edit').addEventListener('click', () => {
 
     // Re-render to update drag handles and icons
     renderNotas();
+    renderHosts(document.getElementById('buscador') ? document.getElementById('buscador').value : "");
     if (window.lucide) lucide.createIcons();
 });
 
@@ -357,7 +441,8 @@ window.addHostServiceRow = function (nombre = '', puerto = '', protocolo = 'http
 document.getElementById('btn-add-host').addEventListener('click', () => {
     document.getElementById('form-host').reset();
     document.getElementById('host-id').value = "";
-    document.getElementById('host-use-domain').checked = true; // Por defecto activo para hosts nuevos
+    document.getElementById('host-use-domain').checked = false;
+    document.getElementById('host-red').value = state.activeRedId;
     document.getElementById('host-services-container').innerHTML = '';
     window.addHostServiceRow('WEB', '443', 'https');
     document.getElementById('modal-host-title').textContent = "Añadir Host";
@@ -371,6 +456,7 @@ window.editarHost = function (hostId) {
     document.getElementById('host-id').value = host.id;
     document.getElementById('host-name').value = host.nombre;
     document.getElementById('host-ip').value = host.ip;
+    document.getElementById('host-red').value = host.redId || state.activeRedId;
     document.getElementById('host-use-domain').checked = host.usarDominio !== undefined ? host.usarDominio : !/^\d{1,3}(\.\d{1,3}){3}$/.test(host.ip);
 
     document.getElementById('host-services-container').innerHTML = '';
@@ -428,6 +514,7 @@ document.getElementById('form-host').addEventListener('submit', (e) => {
         ip: document.getElementById('host-ip').value,
         tipo: document.getElementById('host-type').value,
         usarDominio: document.getElementById('host-use-domain').checked,
+        redId: document.getElementById('host-red').value,
         servicios: servicios
     };
 
@@ -454,6 +541,7 @@ document.getElementById('form-host').addEventListener('submit', (e) => {
 document.getElementById('btn-add-nota').addEventListener('click', () => {
     document.getElementById('form-nota').reset();
     document.getElementById('nota-id').value = "";
+    document.getElementById('nota-red').value = state.activeRedId;
     document.getElementById('modal-nota-title').textContent = "Añadir Nota";
     document.getElementById('modal-nota').classList.add('active');
 });
@@ -463,6 +551,7 @@ window.editarNota = function (id) {
     if (!nota) return;
     document.getElementById('nota-id').value = nota.id;
     document.getElementById('nota-texto').value = nota.texto;
+    document.getElementById('nota-red').value = nota.redId || state.activeRedId;
     document.getElementById('modal-nota-title').textContent = "Editar Nota";
     document.getElementById('modal-nota').classList.add('active');
 }
@@ -480,14 +569,16 @@ document.getElementById('form-nota').addEventListener('submit', (e) => {
     const id = document.getElementById('nota-id').value;
     const txt = document.getElementById('nota-texto').value.trim();
     if (!txt) return;
+    const redId = document.getElementById('nota-red').value;
 
     if (id) {
         const index = state.notas.findIndex(n => n.id === id);
         if (index > -1) {
             state.notas[index].texto = txt;
+            state.notas[index].redId = redId;
         }
     } else {
-        state.notas.push({ id: 'n_' + Date.now() + Math.random(), texto: txt });
+        state.notas.push({ id: 'n_' + Date.now() + Math.random(), texto: txt, redId });
     }
 
     saveData();
@@ -497,16 +588,70 @@ document.getElementById('form-nota').addEventListener('submit', (e) => {
 
 // Import / Export
 document.getElementById('btn-export').addEventListener('click', () => {
-    const dataStr = JSON.stringify(state, null, 2);
+    const container = document.getElementById('export-networks-container');
+    container.innerHTML = '';
+    if (!state.redes || state.redes.length === 0) {
+        alert("No hay redes para exportar.");
+        return;
+    }
+    
+    state.redes.forEach(red => {
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '8px';
+        label.style.cursor = 'pointer';
+        label.style.padding = '5px 0';
+        label.innerHTML = `
+            <input type="checkbox" class="export-network-checkbox" value="${red.id}" checked>
+            <span>${red.nombre} <small style="color:gray;">${red.domain ? '(' + red.domain + ')' : ''}</small></span>
+        `;
+        container.appendChild(label);
+    });
+    
+    document.getElementById('modal-export').classList.add('active');
+});
+
+document.getElementById('form-export')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const selectedCheckboxes = Array.from(document.querySelectorAll('.export-network-checkbox:checked'));
+    if (selectedCheckboxes.length === 0) {
+        alert("Debes seleccionar al menos una red para exportar.");
+        return;
+    }
+    
+    const selectedNetworkIds = selectedCheckboxes.map(cb => cb.value);
+    
+    // Generar estado parcial filtrado
+    const selectedRedes = state.redes.filter(r => selectedNetworkIds.includes(r.id));
+    const selectedHosts = state.hosts.filter(h => selectedNetworkIds.includes(h.redId));
+    const selectedNotas = state.notas.filter(n => selectedNetworkIds.includes(n.redId));
+    
+    // Crear objeto de exportación conservando configuraciones globales si las hay
+    const exportData = {
+        ...state,
+        activeRedId: selectedNetworkIds.length > 0 ? selectedNetworkIds[0] : state.activeRedId,
+        redes: selectedRedes,
+        hosts: selectedHosts,
+        notas: selectedNotas
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    let domainStr = (state.domain || '').replace(/^\.+/, '');
-    const domainPrefix = domainStr ? `${domainStr}_` : '';
-    a.download = `facilitator_${domainPrefix}config_${new Date().toISOString().slice(0, 10)}.json`;
+    
+    // Construir nombre de archivo
+    const networkNames = selectedRedes.map(r => r.nombre.replace(/[^a-z0-9]/gi, '_').toLowerCase()).join('-');
+    const filenamePrefix = networkNames.length > 50 ? networkNames.substring(0, 50) + '_' : networkNames + '_';
+    
+    a.download = `facilitator_${filenamePrefix}config_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    closeModal('modal-export');
 });
 
 document.getElementById('input-import').addEventListener('change', (e) => {
@@ -519,7 +664,7 @@ document.getElementById('input-import').addEventListener('change', (e) => {
             const importedData = JSON.parse(event.target.result);
             if (importedData.hosts) {
                 state = importedData;
-                
+
                 // Si el archivo importado es de la versión antigua, no tendrá el flag de migración.
                 // Forzamos loadData para que corra la migración en caso de ser necesario.
                 if (!state.migratedToPerHostServices) {
@@ -532,7 +677,11 @@ document.getElementById('input-import').addEventListener('change', (e) => {
                 selectedHost = null;
                 selectedService = null;
                 actualizarUrl();
+                populateNetworkSelects();
+                renderActiveNetworkSelect();
+                updateHeaderDomain();
                 renderHosts();
+                renderNotas();
                 renderServices();
                 alert('Configuración importada exitosamente.');
             } else {
@@ -548,29 +697,23 @@ document.getElementById('input-import').addEventListener('change', (e) => {
 
 // Settings
 document.getElementById('btn-settings').addEventListener('click', () => {
-    document.getElementById('settings-domain').value = state.domain !== undefined ? state.domain : DEFAULT_DOMAIN;
+    renderNetworks();
     document.getElementById('modal-settings').classList.add('active');
 });
 
 function updateHeaderDomain() {
     const display = document.getElementById('header-domain-display');
-    if (state.domain && state.domain.trim() !== '') {
-        display.textContent = `- ${state.domain}`;
-        document.title = `Facilitator - ${state.domain}`;
+    const currentRed = state.redes ? state.redes.find(r => r.id === state.activeRedId) : null;
+    if (currentRed && currentRed.domain && currentRed.domain.trim() !== '') {
+        display.textContent = `- ${currentRed.domain}`;
+        document.title = `${currentRed.domain} - Facilitator`;
     } else {
         display.textContent = '';
         document.title = 'Facilitator';
     }
 }
 
-document.getElementById('form-settings').addEventListener('submit', (e) => {
-    e.preventDefault();
-    state.domain = document.getElementById('settings-domain').value;
-    saveData();
-    closeModal('modal-settings');
-    updateHeaderDomain();
-    actualizarUrl();
-});
+
 
 // Theme Setup
 function applyTheme() {
@@ -593,6 +736,198 @@ document.getElementById('btn-theme-toggle').addEventListener('click', () => {
 // INIT
 loadData();
 applyTheme();
+populateNetworkSelects();
+renderActiveNetworkSelect();
 updateHeaderDomain();
 renderHosts();
 renderNotas();
+
+
+
+function renderNetworks() {
+    const container = document.getElementById('networks-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.redes) state.redes = [];
+
+    state.redes.forEach(red => {
+        const div = document.createElement('div');
+        div.className = 'item-wrapper';
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '10px';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '4px';
+        div.style.background = 'var(--bg-secondary)';
+
+        div.innerHTML = `
+            <div>
+                <strong style="display:block;">${red.nombre}</strong>
+                <small style="color:gray;">${red.domain ? 'Dominio: ' + red.domain : 'Sin Dominio'}</small>
+            </div>
+            <div style="display:flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="editNetwork('${red.id}')"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="promptDeleteNetwork('${red.id}')"><i data-lucide="trash-2" class="icon-sm"></i></button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+    if (window.lucide) lucide.createIcons();
+}
+
+window.openNetworkForm = function () {
+    document.getElementById('form-network').reset();
+    document.getElementById('network-id').value = '';
+    document.getElementById('modal-network-title').textContent = 'Añadir Red';
+    document.getElementById('modal-network-form').classList.add('active');
+};
+
+window.editNetwork = function (id) {
+    const red = state.redes.find(r => r.id === id);
+    if (!red) return;
+    document.getElementById('network-id').value = red.id;
+    document.getElementById('network-name').value = red.nombre;
+    document.getElementById('network-domain').value = red.domain || '';
+    document.getElementById('modal-network-title').textContent = 'Editar Red';
+    document.getElementById('modal-network-form').classList.add('active');
+};
+
+let currentDeleteNetworkId = null;
+
+window.promptDeleteNetwork = function (id) {
+    const red = state.redes.find(r => r.id === id);
+    if (!red) return;
+
+    // Validar si es la única red
+    if (state.redes.length <= 1) {
+        alert("No puedes eliminar la única red existente. Por favor, crea una nueva red primero.");
+        return;
+    }
+
+    currentDeleteNetworkId = red.id;
+    document.getElementById('delete-network-name-display').textContent = red.nombre;
+    document.getElementById('delete-network-name-expected').value = red.nombre;
+    document.getElementById('delete-network-confirm').value = '';
+    document.getElementById('btn-confirm-delete').disabled = true;
+
+    document.getElementById('modal-delete-network').classList.add('active');
+};
+
+document.getElementById('delete-network-confirm')?.addEventListener('input', (e) => {
+    const expected = document.getElementById('delete-network-name-expected').value;
+    document.getElementById('btn-confirm-delete').disabled = (e.target.value !== expected);
+});
+
+document.getElementById('form-delete-network')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!currentDeleteNetworkId) return;
+
+    const expected = document.getElementById('delete-network-name-expected').value;
+    const confirms = document.getElementById('delete-network-confirm').value;
+
+    if (expected !== confirms) return;
+
+    // Ejecutar el borrado en cascada
+    state.redes = state.redes.filter(r => r.id !== currentDeleteNetworkId);
+    state.hosts = state.hosts.filter(h => h.redId !== currentDeleteNetworkId);
+    state.notas = state.notas.filter(n => n.redId !== currentDeleteNetworkId);
+
+    // Si borramos la red activa actual, pivotamos a otra.
+    if (state.activeRedId === currentDeleteNetworkId) {
+        state.activeRedId = state.redes[0].id;
+        selectedHost = null;
+        selectedService = null;
+    }
+
+    currentDeleteNetworkId = null;
+    saveData();
+    closeModal('modal-delete-network');
+    renderNetworks();
+    populateNetworkSelects();
+    renderActiveNetworkSelect();
+    applyActiveNetworkState();
+});
+
+document.getElementById('form-network')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = document.getElementById('network-id').value;
+    const nombre = document.getElementById('network-name').value.trim();
+    const domain = document.getElementById('network-domain').value.trim();
+
+    if (!nombre) return;
+
+    if (id) {
+        const index = state.redes.findIndex(r => r.id === id);
+        if (index > -1) {
+            state.redes[index].nombre = nombre;
+            state.redes[index].domain = domain;
+        }
+    } else {
+        const newRed = { id: 'red_' + Date.now(), nombre, domain };
+        state.redes.push(newRed);
+    }
+
+    saveData();
+    closeModal('modal-network-form');
+    renderNetworks();
+    populateNetworkSelects();
+    renderActiveNetworkSelect();
+    applyActiveNetworkState();
+});
+
+function renderActiveNetworkSelect() {
+    const select = document.getElementById('active-network-select');
+    if (!select) return;
+    select.innerHTML = '';
+
+    if (!state.redes) return;
+
+    state.redes.forEach(red => {
+        const opt = document.createElement('option');
+        opt.value = red.id;
+        opt.textContent = red.nombre;
+        if (red.id === state.activeRedId) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function populateNetworkSelects() {
+    ['host-red', 'nota-red'].forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '';
+        state.redes.forEach((red, idx) => {
+            const opt = document.createElement('option');
+            opt.value = red.id;
+            opt.textContent = red.nombre;
+            // Si hay un valor, mantenlo. Si no, selecciona la red activa por defecto.
+            if ((currentVal && currentVal === red.id) || (!currentVal && state.activeRedId === red.id)) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    });
+}
+
+document.getElementById('active-network-select')?.addEventListener('change', (e) => {
+    state.activeRedId = e.target.value;
+    selectedHost = null;
+    selectedService = null;
+    saveData();
+    applyActiveNetworkState();
+});
+
+function applyActiveNetworkState() {
+    actualizarUrl();
+    updateHeaderDomain();
+    renderHosts(document.getElementById('buscador').value);
+    renderNotas();
+    if (selectedHost) {
+        renderServices();
+    } else {
+        document.getElementById('modal-services-selection').classList.remove('active');
+    }
+}

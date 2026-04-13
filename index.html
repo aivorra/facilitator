@@ -19,6 +19,10 @@
                     style="font-weight: 400; color: var(--secondary); font-size: 16px; margin-left: 5px;"></span></h2>
         </div>
         <div class="header-actions" style="align-items: center;">
+            <select id="active-network-select" class="btn btn-secondary"
+                style="margin-right: 15px; padding: 6px 12px; border-radius: 4px; font-weight: 500;">
+                <!-- Redes inyectadas -->
+            </select>
             <button id="btn-theme-toggle" class="btn btn-text" style="padding: 8px; border-radius: 50%;"
                 title="Alternar Tema"><i data-lucide="moon" class="icon-sm"></i></button>
             <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 10px;"></div>
@@ -75,7 +79,7 @@
     </main>
 
     <footer class="app-footer">
-        <p>Versión 2.0 | Agustin Ivorra</p>
+        <p>Versión 2.1 | Agustin Ivorra</p>
     </footer>
 
     <!-- Modals -->
@@ -110,6 +114,10 @@
                 <div class="form-group">
                     <label>IP / Hostname</label>
                     <input type="text" id="host-ip" required>
+                </div>
+                <div class="form-group">
+                    <label>Red</label>
+                    <select id="host-red" required></select>
                 </div>
                 <div class="form-group" style="display:flex; align-items:center; gap: 8px;">
                     <input type="checkbox" id="host-use-domain" style="width:auto; margin-bottom:0;">
@@ -152,6 +160,10 @@
             <form id="form-nota">
                 <input type="hidden" id="nota-id">
                 <div class="form-group">
+                    <label>Red</label>
+                    <select id="nota-red" required></select>
+                </div>
+                <div class="form-group">
                     <label>Contenido de la nota (Muestra texto y acepta HTML intermedio)</label>
                     <textarea id="nota-texto" required
                         style="width:100%; min-height:80px; padding:10px; border: 1px solid var(--border-color); border-radius:4px; font-family:inherit; resize:vertical;"></textarea>
@@ -165,18 +177,84 @@
     </div>
 
     <div id="modal-settings" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin:0;">Gestión de Redes</h3>
+                <button type="button" class="btn btn-sm btn-success" onclick="openNetworkForm()"><i data-lucide="plus"
+                        class="icon-sm"></i> Añadir Red</button>
+            </div>
+
+            <div id="networks-container"
+                style="display:flex; flex-direction:column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                <!-- Networks injected by JS -->
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button type="button" class="btn btn-text" onclick="closeModal('modal-settings')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-network-form" class="modal">
         <div class="modal-content">
-            <h3>Configuración General</h3>
-            <form id="form-settings">
+            <h3 id="modal-network-title">Añadir Red</h3>
+            <form id="form-network">
+                <input type="hidden" id="network-id">
+                <div class="form-group">
+                    <label>Nombre de la Red</label>
+                    <input type="text" id="network-name" required placeholder="Ej: Red Principal">
+                </div>
                 <div class="form-group">
                     <label>Dominio Predeterminado</label>
-                    <input type="text" id="settings-domain" placeholder="Ej: .inte1.int">
+                    <input type="text" id="network-domain" placeholder="Ej: .local">
                     <small style="color: gray; display: block; margin-top: 8px; font-size: 12px; line-height: 1.4;">Este
-                        sufijo se añadirá si el checkbox <b>Dimminio Global</b> está seleccionado.</small>
+                        sufijo se añadirá si el host tiene "Dominio Global" activado.</small>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" class="btn btn-text" onclick="closeModal('modal-settings')">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    <button type="button" class="btn btn-text"
+                        onclick="closeModal('modal-network-form')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-delete-network" class="modal">
+        <div class="modal-content">
+            <h3 style="color: var(--danger); display: flex; align-items: center; gap: 8px;"><i
+                    data-lucide="alert-triangle"></i> Eliminar Red</h3>
+            <p>Estás a punto de eliminar la red <strong id="delete-network-name-display"></strong>.</p>
+            <p style="color: var(--danger); font-size: 14px; margin-top: 5px;"><strong>ADVERTENCIA:</strong> Esto
+                también eliminará todos los Hosts y Notas asociados a esta red de forma permanente.</p>
+            <form id="form-delete-network">
+                <input type="hidden" id="delete-network-id">
+                <input type="hidden" id="delete-network-name-expected">
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Escribe el nombre de la red para confirmar:</label>
+                    <input type="text" id="delete-network-confirm" required autocomplete="off">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text"
+                        onclick="closeModal('modal-delete-network')">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="btn-confirm-delete" disabled>Eliminar Red</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-export" class="modal">
+        <div class="modal-content">
+            <h3>Seleccionar Redes a Exportar</h3>
+            <p style="font-size: 13px; color: gray; margin-bottom: 15px;">Selecciona las redes que deseas incluir en el
+                archivo de exportación:</p>
+            <form id="form-export">
+                <div id="export-networks-container"
+                    style="max-height: 200px; overflow-y: auto; gap: 8px; display: flex; flex-direction: column; margin-bottom: 20px;">
+                    <!-- Checkboxes injected by JS -->
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text" onclick="closeModal('modal-export')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Exportar</button>
                 </div>
             </form>
         </div>

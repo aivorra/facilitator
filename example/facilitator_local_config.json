@@ -1,0 +1,116 @@
+{
+  "hosts": [
+    {
+      "id": "mnxj44sto0iu58d46n",
+      "nombre": "App 1",
+      "ip": "app1",
+      "tipo": "application",
+      "usarDominio": true,
+      "redId": "red_default_434193000000",
+      "servicios": [
+        {
+          "id": "s_17761055694090.7641802608688415",
+          "nombre": "WEB",
+          "puerto": "443",
+          "protocolo": "https"
+        }
+      ]
+    },
+    {
+      "id": "mnxj4w3nr8yctfte4w",
+      "nombre": "Server 1",
+      "ip": "192.168.1.101",
+      "tipo": "server",
+      "usarDominio": false,
+      "redId": "red_default_434193000000",
+      "servicios": [
+        {
+          "id": "s_17761055636050.7691806476373786",
+          "nombre": "WEB",
+          "puerto": "443",
+          "protocolo": "https"
+        },
+        {
+          "id": "s_17761055636050.3887150254163527",
+          "nombre": "Portainer",
+          "puerto": "9443",
+          "protocolo": "https"
+        },
+        {
+          "id": "s_17761055636050.9259783172212087",
+          "nombre": "Zabbix",
+          "puerto": "8443",
+          "protocolo": "https"
+        }
+      ]
+    },
+    {
+      "id": "mnxj5huo2bsmv3aqtcq",
+      "nombre": "Router",
+      "ip": "192.168.1.1",
+      "tipo": "networking",
+      "usarDominio": false,
+      "redId": "red_default_434193000000",
+      "servicios": [
+        {
+          "id": "s_17761051567680.17606265350055617",
+          "nombre": "WEB",
+          "puerto": "443",
+          "protocolo": "https"
+        }
+      ]
+    },
+    {
+      "id": "mnxj5qiq8xpc1m3qrkc",
+      "nombre": "Switch LAN",
+      "ip": "192.168.1.2",
+      "tipo": "networking",
+      "usarDominio": false,
+      "redId": "red_default_434193000000",
+      "servicios": [
+        {
+          "id": "s_17761051680020.4353352709294763",
+          "nombre": "WEB",
+          "puerto": "443",
+          "protocolo": "https"
+        }
+      ]
+    },
+    {
+      "id": "mnxjggg2m4fyk8nrmpc",
+      "nombre": "Server 1 - iLO",
+      "ip": "192.168.1.254",
+      "tipo": "server",
+      "usarDominio": false,
+      "redId": "red_default_434193000000",
+      "servicios": [
+        {
+          "id": "s_17761056681620.7170147933162693",
+          "nombre": "WEB",
+          "puerto": "443",
+          "protocolo": "https"
+        }
+      ]
+    }
+  ],
+  "domain": ".inte1.int",
+  "darkMode": true,
+  "migratedToCategories": true,
+  "migratedToPerHostServices": true,
+  "notas": [
+    {
+      "id": "n_17761013074560.9688871895889106",
+      "texto": "Esta red es para registrar links personales.",
+      "redId": "red_default_434193000000"
+    }
+  ],
+  "redes": [
+    {
+      "id": "red_default_434193000000",
+      "nombre": "Local",
+      "domain": ".local"
+    }
+  ],
+  "activeRedId": "red_default_434193000000",
+  "migratedToNetworks": true
+}
