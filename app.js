@@ -191,7 +191,15 @@ function renderHosts(filtro = "") {
         'base_station': { title: 'Base Station', types: ['base_station'], elements: [] }
     };
 
-    const filteredHosts = state.hosts.filter(h => h.nombre.toLowerCase().includes(filtro.toLowerCase()) && h.redId === state.activeRedId);
+    const q = filtro.toLowerCase();
+    const filteredHosts = state.hosts.filter(h => {
+        if (h.redId !== state.activeRedId) return false;
+        if (!q) return true;
+        if (h.nombre.toLowerCase().includes(q)) return true;
+        if (h.ip && h.ip.toLowerCase().includes(q)) return true;
+        if (h.servicios && h.servicios.some(s => s.nombre.toLowerCase().includes(q))) return true;
+        return false;
+    });
 
     filteredHosts.forEach(host => {
         let colKey = null;
