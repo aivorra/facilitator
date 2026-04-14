@@ -1,4 +1,6 @@
 // Configuración inicial por defecto (Migrada desde data2.js original)
+const APP_VERSION = "2.2";
+const GITHUB_REPO = "aivorra/facilitator";
 const DEFAULT_DOMAIN = ".local";
 
 const defaultHostsData = [
@@ -260,7 +262,7 @@ function renderHosts(filtro = "") {
                     const item = state.hosts.splice(draggedHostIndex, 1)[0];
                     let dropIndex = state.hosts.indexOf(host);
                     if (dropIndex === -1) dropIndex = state.hosts.length;
-                    
+
                     state.hosts.splice(dropIndex, 0, item);
                     saveData();
                     renderHosts(filtro);
@@ -278,11 +280,11 @@ function renderHosts(filtro = "") {
             const h3 = document.createElement('h3');
             h3.textContent = columns[key].title;
             colDiv.appendChild(h3);
-            
+
             const gridDiv = document.createElement('div');
             gridDiv.className = 'buttons-grid';
             columns[key].elements.forEach(el => gridDiv.appendChild(el));
-            
+
             colDiv.appendChild(gridDiv);
             container.appendChild(colDiv);
         }
@@ -607,7 +609,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
         alert("No hay redes para exportar.");
         return;
     }
-    
+
     state.redes.forEach(red => {
         const label = document.createElement('label');
         label.style.display = 'flex';
@@ -621,26 +623,26 @@ document.getElementById('btn-export').addEventListener('click', () => {
         `;
         container.appendChild(label);
     });
-    
+
     document.getElementById('modal-export').classList.add('active');
 });
 
 document.getElementById('form-export')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    
+
     const selectedCheckboxes = Array.from(document.querySelectorAll('.export-network-checkbox:checked'));
     if (selectedCheckboxes.length === 0) {
         alert("Debes seleccionar al menos una red para exportar.");
         return;
     }
-    
+
     const selectedNetworkIds = selectedCheckboxes.map(cb => cb.value);
-    
+
     // Generar estado parcial filtrado
     const selectedRedes = state.redes.filter(r => selectedNetworkIds.includes(r.id));
     const selectedHosts = state.hosts.filter(h => selectedNetworkIds.includes(h.redId));
     const selectedNotas = state.notas.filter(n => selectedNetworkIds.includes(n.redId));
-    
+
     // Crear objeto de exportación conservando configuraciones globales si las hay
     const exportData = {
         ...state,
@@ -649,21 +651,21 @@ document.getElementById('form-export')?.addEventListener('submit', (e) => {
         hosts: selectedHosts,
         notas: selectedNotas
     };
-    
+
     const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    
+
     // Construir nombre de archivo
     const networkNames = selectedRedes.map(r => r.nombre.replace(/[^a-z0-9]/gi, '_').toLowerCase()).join('-');
     const filenamePrefix = networkNames.length > 50 ? networkNames.substring(0, 50) + '_' : networkNames + '_';
-    
+
     a.download = `facilitator_${filenamePrefix}config_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     closeModal('modal-export');
 });
 
@@ -754,6 +756,10 @@ renderActiveNetworkSelect();
 updateHeaderDomain();
 renderHosts();
 renderNotas();
+
+// Inyectar versión en el footer
+const footerVersion = document.getElementById('footer-version');
+if (footerVersion) footerVersion.textContent = `Versión ${APP_VERSION} | Agustin Ivorra`;
 
 
 
@@ -944,3 +950,82 @@ function applyActiveNetworkState() {
         document.getElementById('modal-services-selection').classList.remove('active');
     }
 }
+
+// ── Update Check ─────────────────────────────────────────────────────────────
+function parseVersion(v) {
+    // Elimina prefijos como "v" (ej: "v2.3" → [2,3])
+    return String(v).replace(/^v/i, '').split('.').map(Number);
+}
+
+function isNewer(remote, local) {
+    const r = parseVersion(remote);
+    const l = parseVersion(local);
+    for (let i = 0; i < Math.max(r.length, l.length); i++) {
+        const rv = r[i] ?? 0;
+        const lv = l[i] ?? 0;
+        if (rv > lv) return true;
+        if (rv < lv) return false;
+    }
+    return false;
+}
+
+async function checkForUpdates() {
+    try {
+        const res = await fetch(
+            `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+            { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const remoteTag = data.tag_name || '';
+        if (!remoteTag || !isNewer(remoteTag, APP_VERSION)) return;
+
+        // Mostrar banner de actualización debajo del texto de versión
+        const footerP = document.querySelector('.app-footer p');
+        if (!footerP) return;
+        const footerEl = footerP.parentElement;
+
+        const banner = document.createElement('a');
+        banner.id = 'update-banner';
+        banner.href = data.html_url;
+        banner.target = '_blank';
+        banner.rel = 'noopener noreferrer';
+        banner.title = `Ver ${remoteTag} en GitHub`;
+        banner.innerHTML = `<i data-lucide="arrow-up-circle" class="icon-sm" style="vertical-align:middle;"></i>&nbsp;Nueva versión disponible: ${remoteTag}`;
+        banner.style.cssText = [
+            'display:inline-flex',
+            'align-items:center',
+            'gap:5px',
+            'padding:3px 10px',
+            'border-radius:20px',
+            'font-size:12px',
+            'font-weight:600',
+            'text-decoration:none',
+            'color:#fff',
+            'background:linear-gradient(135deg,#3b82f6,#6366f1)',
+            'box-shadow:0 2px 8px rgba(99,102,241,0.4)',
+            'animation:pulse-badge 2s ease-in-out infinite'
+        ].join(';');
+
+        footerEl.insertBefore(banner, footerP);
+        if (window.lucide) lucide.createIcons();
+    } catch (_) {
+        // Falla en silencio — sin conexión o repo no existente
+    }
+}
+
+// Inyectar keyframe de pulso
+(function injectUpdateStyles() {
+    if (document.getElementById('update-check-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'update-check-styles';
+    style.textContent = `
+        @keyframes pulse-badge {
+            0%, 100% { box-shadow: 0 2px 8px rgba(99,102,241,0.4); }
+            50%        { box-shadow: 0 2px 16px rgba(99,102,241,0.75); }
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+checkForUpdates();
