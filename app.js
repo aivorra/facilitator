@@ -95,10 +95,15 @@ function loadData() {
 }
 
 function initDefaultData() {
+    const defaultRedId = 'red_default_' + Date.now();
     state.hosts = JSON.parse(JSON.stringify(defaultHostsData));
     state.notas = JSON.parse(JSON.stringify(defaultNotas));
     state.domain = DEFAULT_DOMAIN;
     state.darkMode = false;
+    state.redes = [{ id: defaultRedId, nombre: 'Red Local', domain: DEFAULT_DOMAIN }];
+    state.activeRedId = defaultRedId;
+    state.migratedToNetworks = true;
+    state.migratedToPerHostServices = true;
     saveData();
 }
 
