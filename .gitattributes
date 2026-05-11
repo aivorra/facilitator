@@ -1,0 +1,2 @@
+*.pass filter=git-crypt diff=git-crypt
+*_config_*.json filter=git-crypt diff=git-crypt
