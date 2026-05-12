@@ -384,11 +384,16 @@ function actualizarUrl() {
     }
 
     const prot = selectedService.protocolo || 'https';
-    let portPart = `:${selectedService.puerto}`;
-    if ((prot === 'http' && selectedService.puerto === '80') || (prot === 'https' && selectedService.puerto === '443')) {
-        portPart = '';
+    let url;
+    if (prot === 'file') {
+        url = `file://${hostFull}`;
+    } else {
+        let portPart = `:${selectedService.puerto}`;
+        if ((prot === 'http' && selectedService.puerto === '80') || (prot === 'https' && selectedService.puerto === '443')) {
+            portPart = '';
+        }
+        url = `${prot}://${hostFull}${portPart}`;
     }
-    const url = `${prot}://${hostFull}${portPart}`;
 
     input.value = url;
     btn.disabled = false;
@@ -442,9 +447,10 @@ window.addHostServiceRow = function (nombre = '', puerto = '', protocolo = 'http
     row.innerHTML = `
         <input type="text" class="svc-name" placeholder="Nombre (Ej: Web)" value="${nombre}" style="flex:1;">
         <input type="number" class="svc-port" placeholder="Puerto" value="${puerto}" style="width:100px;">
-        <select class="svc-prot" style="width:80px">
+        <select class="svc-prot" style="width:90px">
             <option value="https" ${protocolo === 'https' ? 'selected' : ''}>HTTPS</option>
             <option value="http" ${protocolo === 'http' ? 'selected' : ''}>HTTP</option>
+            <option value="file" ${protocolo === 'file' ? 'selected' : ''}>FILE</option>
         </select>
         <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i data-lucide="trash-2" class="icon-sm"></i></button>
     `;
