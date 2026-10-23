@@ -1,5 +1,5 @@
 // Configuración inicial por defecto (Migrada desde data2.js original)
-const APP_VERSION = "2.4";
+const APP_VERSION = "2.6";
 const GITHUB_REPO = "aivorra/facilitator";
 const DEFAULT_DOMAIN = ".local";
 
