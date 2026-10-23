@@ -57,8 +57,16 @@
                 <button id="btn-open-url" class="btn btn-primary" disabled>Abrir Web</button>
             </div>
 
-            <div class="columns-container" id="hosts-container">
-                <!-- Columns will be injected by JS -->
+            <div class="columns-carousel-wrapper">
+                <button type="button" id="btn-col-prev" class="col-nav-btn col-nav-prev" title="Columnas anteriores" style="display:none;">
+                    <i data-lucide="chevron-left" class="icon-sm"></i>
+                </button>
+                <div class="columns-container" id="hosts-container">
+                    <!-- Columns will be injected by JS -->
+                </div>
+                <button type="button" id="btn-col-next" class="col-nav-btn col-nav-next" title="Columnas siguientes" style="display:none;">
+                    <i data-lucide="chevron-right" class="icon-sm"></i>
+                </button>
             </div>
 
 
@@ -127,10 +135,7 @@
                 <div class="form-group">
                     <label>Tipo</label>
                     <select id="host-type" required>
-                        <option value="application">Application</option>
-                        <option value="server">Server</option>
-                        <option value="networking">Networking</option>
-                        <option value="base_station">Base Station</option>
+                        <!-- Dynamic options populated from state.tipos -->
                     </select>
                 </div>
                 <div class="form-group"
@@ -178,21 +183,80 @@
     </div>
 
     <div id="modal-settings" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 650px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin:0;">Gestión de Redes</h3>
-                <button type="button" class="btn btn-sm btn-success" onclick="openNetworkForm()"><i data-lucide="plus"
-                        class="icon-sm"></i> Añadir Red</button>
+                <h3 style="margin:0;">Configuración</h3>
+                <button type="button" class="btn btn-text" style="padding: 4px; border-radius: 50%; display: flex;" onclick="closeModal('modal-settings')" title="Cerrar">
+                    <i data-lucide="x" class="icon-sm"></i>
+                </button>
             </div>
 
-            <div id="networks-container"
-                style="display:flex; flex-direction:column; gap: 10px; max-height: 400px; overflow-y: auto;">
-                <!-- Networks injected by JS -->
+            <div class="settings-tabs">
+                <button type="button" id="btn-tab-networks" class="settings-tab-btn active" onclick="switchSettingsTab('redes')">
+                    <i data-lucide="globe" class="icon-sm"></i> Redes
+                </button>
+                <button type="button" id="btn-tab-types" class="settings-tab-btn" onclick="switchSettingsTab('tipos')">
+                    <i data-lucide="tags" class="icon-sm"></i> Tipos de Host
+                </button>
+            </div>
+
+            <!-- Tab Redes -->
+            <div id="tab-networks" class="settings-tab-content active">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-weight: 600; font-size: 14px; color: var(--text-color);">Redes Configuradas</span>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openNetworkForm()"><i data-lucide="plus"
+                            class="icon-sm"></i> Añadir Red</button>
+                </div>
+                <div id="networks-container"
+                    style="display:flex; flex-direction:column; gap: 10px; max-height: 380px; overflow-y: auto;">
+                    <!-- Networks injected by JS -->
+                </div>
+            </div>
+
+            <!-- Tab Tipos -->
+            <div id="tab-types" class="settings-tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-weight: 600; font-size: 14px; color: var(--text-color);">Tipos de Host Configurados</span>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openTipoForm()"><i data-lucide="plus"
+                            class="icon-sm"></i> Añadir Tipo</button>
+                </div>
+                <div id="tipos-container"
+                    style="display:flex; flex-direction:column; gap: 10px; max-height: 380px; overflow-y: auto;">
+                    <!-- Tipos injected by JS -->
+                </div>
             </div>
 
             <div class="modal-actions" style="margin-top: 20px;">
                 <button type="button" class="btn btn-text" onclick="closeModal('modal-settings')">Cerrar</button>
             </div>
+        </div>
+    </div>
+
+    <div id="modal-tipo-form" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-tipo-title">Añadir Tipo</h3>
+            <form id="form-tipo">
+                <input type="hidden" id="tipo-id">
+                <div class="form-group">
+                    <label>Nombre del Tipo</label>
+                    <input type="text" id="tipo-name" required placeholder="Ej: Base de Datos">
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <div style="display:flex; align-items:center; gap: 10px; margin-bottom: 8px;">
+                        <input type="color" id="tipo-color" value="#007bff" style="width: 45px; height: 38px; padding: 2px; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <input type="text" id="tipo-color-hex" value="#007bff" style="flex:1; font-family: monospace; text-transform: lowercase;" maxlength="7" pattern="^#[0-9a-fA-F]{6}$" required>
+                    </div>
+                    <div style="font-size: 12px; color: gray; margin-bottom: 6px;">Colores sugeridos:</div>
+                    <div id="tipo-color-presets" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <!-- Preset color dots injected by JS -->
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-text" onclick="closeModal('modal-tipo-form')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
         </div>
     </div>
 

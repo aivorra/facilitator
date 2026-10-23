@@ -1,7 +1,20 @@
 // Configuración inicial por defecto (Migrada desde data2.js original)
-const APP_VERSION = "2.3";
+const APP_VERSION = "2.4";
 const GITHUB_REPO = "aivorra/facilitator";
 const DEFAULT_DOMAIN = ".local";
+
+const DEFAULT_TIPOS = [
+    { id: 'application', nombre: 'Application', color: '#77cd77' },
+    { id: 'server', nombre: 'Server', color: '#a76ce5' },
+    { id: 'networking', nombre: 'Networking', color: '#1b5e20' },
+    { id: 'base_station', nombre: 'Base Station', color: '#0056b3' }
+];
+
+const COLOR_PRESETS = [
+    '#77cd77', '#a76ce5', '#1b5e20', '#0056b3',
+    '#e11d48', '#f59e0b', '#06b6d4', '#6366f1',
+    '#ec4899', '#64748b'
+];
 
 const defaultHostsData = [
 ];
@@ -14,7 +27,8 @@ let state = {
     hosts: [],
     notas: [],
     domain: DEFAULT_DOMAIN,
-    darkMode: false
+    darkMode: false,
+    tipos: []
 };
 
 
@@ -24,6 +38,35 @@ let editMode = false;
 
 // Utilidades
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
+
+function getContrastColor(hexColor) {
+    if (!hexColor || !hexColor.startsWith('#')) return '#ffffff';
+    let hex = hexColor.replace('#', '');
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 160 ? '#1a202c' : '#ffffff';
+}
+
+function applyDynamicTipoStyles() {
+    let styleTag = document.getElementById('dynamic-tipo-styles');
+    if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'dynamic-tipo-styles';
+        document.head.appendChild(styleTag);
+    }
+    let css = '';
+    (state.tipos || []).forEach(t => {
+        const safeClass = 'cat-' + t.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const textColor = getContrastColor(t.color);
+        css += `.${safeClass} { background-color: ${t.color} !important; color: ${textColor} !important; }\n`;
+    });
+    styleTag.textContent = css;
+}
 
 // LocalStorage Logic
 function loadData() {
@@ -81,11 +124,50 @@ function loadData() {
                 saveData();
             }
 
-
             if (!state.notas || state.notas.length === 0) {
                 state.notas = JSON.parse(JSON.stringify(defaultNotas));
                 saveData();
             }
+
+            // Migración para tipos configurables
+            if (!state.tipos || state.tipos.length === 0) {
+                state.tipos = JSON.parse(JSON.stringify(DEFAULT_TIPOS));
+                if (state.hosts) {
+                    state.hosts.forEach(h => {
+                        if (h.tipo === 'service') {
+                            h.tipo = 'application';
+                        } else if (h.tipo && !state.tipos.some(t => t.id === h.tipo)) {
+                            state.tipos.push({
+                                id: h.tipo,
+                                nombre: h.tipo.charAt(0).toUpperCase() + h.tipo.slice(1).replace(/_/g, ' '),
+                                color: '#6c757d'
+                            });
+                        }
+                    });
+                }
+                state.migratedToCustomTypes = true;
+                saveData();
+            } else {
+                let modified = false;
+                if (state.hosts) {
+                    state.hosts.forEach(h => {
+                        if (h.tipo === 'service') {
+                            h.tipo = 'application';
+                            modified = true;
+                        } else if (h.tipo && !state.tipos.some(t => t.id === h.tipo)) {
+                            state.tipos.push({
+                                id: h.tipo,
+                                nombre: h.tipo.charAt(0).toUpperCase() + h.tipo.slice(1).replace(/_/g, ' '),
+                                color: '#6c757d'
+                            });
+                            modified = true;
+                        }
+                    });
+                }
+                if (modified) saveData();
+            }
+
+            applyDynamicTipoStyles();
 
         } catch (e) {
             console.error("Error validando datos locales", e);
@@ -104,9 +186,12 @@ function initDefaultData() {
     state.darkMode = false;
     state.redes = [{ id: defaultRedId, nombre: 'Red Local', domain: DEFAULT_DOMAIN }];
     state.activeRedId = defaultRedId;
+    state.tipos = JSON.parse(JSON.stringify(DEFAULT_TIPOS));
     state.migratedToNetworks = true;
     state.migratedToPerHostServices = true;
+    state.migratedToCustomTypes = true;
     saveData();
+    applyDynamicTipoStyles();
 }
 
 function saveData() {
@@ -180,18 +265,51 @@ function renderNotas() {
 }
 
 let draggedHostIndex = null;
+let draggedColumnTipoId = null;
+let autoScrollTimer = null;
+
+function startAutoScroll(direction) {
+    if (autoScrollTimer) return;
+    const container = document.getElementById('hosts-container');
+    if (!container) return;
+    autoScrollTimer = setInterval(() => {
+        container.scrollLeft += direction * 20;
+        updateColNavButtons();
+    }, 30);
+}
+
+function stopAutoScroll() {
+    if (autoScrollTimer) {
+        clearInterval(autoScrollTimer);
+        autoScrollTimer = null;
+    }
+}
+
+function updateColNavButtons() {
+    const container = document.getElementById('hosts-container');
+    const prevBtn = document.getElementById('btn-col-prev');
+    const nextBtn = document.getElementById('btn-col-next');
+    if (!container || !prevBtn || !nextBtn) return;
+
+    prevBtn.disabled = container.scrollLeft <= 5;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    nextBtn.disabled = container.scrollLeft >= maxScroll - 5;
+}
 
 function renderHosts(filtro = "") {
     const container = document.getElementById('hosts-container');
     container.innerHTML = "";
 
-    // Preparar columnas
-    const columns = {
-        'application': { title: 'Application', types: ['application', 'service'], elements: [] },
-        'server': { title: 'Server', types: ['server'], elements: [] },
-        'networking': { title: 'Networking', types: ['networking'], elements: [] },
-        'base_station': { title: 'Base Station', types: ['base_station'], elements: [] }
-    };
+    // Garantizar que state.tipos existe
+    if (!state.tipos || state.tipos.length === 0) {
+        state.tipos = JSON.parse(JSON.stringify(DEFAULT_TIPOS));
+    }
+
+    // Preparar columnas basadas en state.tipos
+    const columns = {};
+    state.tipos.forEach(t => {
+        columns[t.id] = { id: t.id, title: t.nombre, color: t.color, elements: [] };
+    });
 
     const q = filtro.toLowerCase();
     const filteredHosts = state.hosts.filter(h => {
@@ -204,14 +322,11 @@ function renderHosts(filtro = "") {
     });
 
     filteredHosts.forEach(host => {
-        let colKey = null;
-        for (let key in columns) {
-            if (columns[key].types.includes(host.tipo)) {
-                colKey = key;
-                break;
-            }
+        let colKey = host.tipo;
+        if (colKey === 'service') colKey = 'application';
+        if (!columns[colKey]) {
+            colKey = state.tipos[0] ? state.tipos[0].id : 'application';
         }
-        if (!colKey) colKey = 'application'; // fallback
 
         const indexInGlobal = state.hosts.indexOf(host);
         const isSelected = selectedHost && selectedHost.id === host.id ? 'selected' : '';
@@ -222,9 +337,10 @@ function renderHosts(filtro = "") {
             div.setAttribute('draggable', 'true');
         }
 
+        const safeCat = 'cat-' + (host.tipo || 'application').replace(/[^a-zA-Z0-9_-]/g, '_');
         div.innerHTML = `
             ${editMode && filtro === "" ? '<div class="drag-handle" style="display:flex; align-items:center; cursor:grab; color:var(--text-secondary);"><i data-lucide="grip-vertical" class="icon-sm"></i></div>' : ''}
-            <button class="host-btn cat-${host.tipo} ${isSelected}" onclick="seleccionarHost('${host.id}')" style="flex:1;">
+            <button class="host-btn ${safeCat} ${isSelected}" onclick="seleccionarHost('${host.id}')" style="flex:1;">
                 ${host.nombre}
             </button>
             <button class="btn-action edit-only" onclick="editarHost('${host.id}')" title="Editar"><i data-lucide="pencil" class="icon-sm"></i></button>
@@ -233,29 +349,35 @@ function renderHosts(filtro = "") {
 
         if (editMode && filtro === "") {
             div.addEventListener('dragstart', (e) => {
+                e.stopPropagation(); // Evitar disparar arrastre de la columna
                 draggedHostIndex = indexInGlobal;
                 e.dataTransfer.effectAllowed = 'move';
                 setTimeout(() => div.classList.add('dragging'), 0);
             });
-            div.addEventListener('dragend', () => {
+            div.addEventListener('dragend', (e) => {
+                e.stopPropagation();
                 div.classList.remove('dragging');
                 draggedHostIndex = null;
                 renderHosts(filtro);
             });
             div.addEventListener('dragover', (e) => {
+                e.stopPropagation();
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
             });
             div.addEventListener('dragenter', (e) => {
+                e.stopPropagation();
                 e.preventDefault();
                 if (draggedHostIndex !== null && indexInGlobal !== draggedHostIndex) {
                     div.style.borderTop = "3px dashed var(--primary)";
                 }
             });
             div.addEventListener('dragleave', (e) => {
+                e.stopPropagation();
                 div.style.borderTop = "";
             });
             div.addEventListener('drop', (e) => {
+                e.stopPropagation();
                 e.preventDefault();
                 div.style.borderTop = "";
                 if (draggedHostIndex !== null && draggedHostIndex !== indexInGlobal) {
@@ -273,22 +395,114 @@ function renderHosts(filtro = "") {
         columns[colKey].elements.push(div);
     });
 
-    for (let key in columns) {
-        if (columns[key].elements.length > 0) {
+    let visibleCols = 0;
+    state.tipos.forEach(tipo => {
+        const colData = columns[tipo.id];
+        if (colData && colData.elements.length > 0) {
+            visibleCols++;
             const colDiv = document.createElement('div');
             colDiv.className = 'column';
+            colDiv.dataset.tipoId = tipo.id;
+
             const h3 = document.createElement('h3');
-            h3.textContent = columns[key].title;
+            h3.style.display = 'flex';
+            h3.style.alignItems = 'center';
+            h3.style.justifyContent = 'center';
+            h3.style.gap = '8px';
+
+            if (editMode && filtro === "") {
+                colDiv.setAttribute('draggable', 'true');
+                h3.innerHTML = `
+                    <span class="col-drag-handle" title="Arrastrar columna para reordenar">
+                        <i data-lucide="grip-vertical" class="icon-sm"></i>
+                    </span>
+                    <span style="flex:1; text-align:center;">${tipo.nombre}</span>
+                `;
+
+                colDiv.addEventListener('dragstart', (e) => {
+                    draggedColumnTipoId = tipo.id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => colDiv.classList.add('dragging-col'), 0);
+                });
+
+                colDiv.addEventListener('dragend', () => {
+                    colDiv.classList.remove('dragging-col');
+                    draggedColumnTipoId = null;
+                    stopAutoScroll();
+                    renderHosts(filtro);
+                });
+
+                colDiv.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    const rect = container.getBoundingClientRect();
+                    const edgeMargin = 70;
+                    if (e.clientX < rect.left + edgeMargin) {
+                        startAutoScroll(-1);
+                    } else if (e.clientX > rect.right - edgeMargin) {
+                        startAutoScroll(1);
+                    } else {
+                        stopAutoScroll();
+                    }
+                });
+
+                colDiv.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    if (draggedColumnTipoId && draggedColumnTipoId !== tipo.id) {
+                        colDiv.style.borderLeft = "4px dashed var(--primary)";
+                    }
+                });
+
+                colDiv.addEventListener('dragleave', () => {
+                    colDiv.style.borderLeft = "";
+                });
+
+                colDiv.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    colDiv.style.borderLeft = "";
+                    stopAutoScroll();
+                    if (draggedColumnTipoId && draggedColumnTipoId !== tipo.id) {
+                        const fromIdx = state.tipos.findIndex(t => t.id === draggedColumnTipoId);
+                        const toIdx = state.tipos.findIndex(t => t.id === tipo.id);
+                        if (fromIdx > -1 && toIdx > -1) {
+                            const moved = state.tipos.splice(fromIdx, 1)[0];
+                            state.tipos.splice(toIdx, 0, moved);
+                            saveData();
+                            renderHosts(filtro);
+                        }
+                    }
+                });
+
+            } else {
+                h3.innerHTML = `<span>${tipo.nombre}</span>`;
+            }
+
             colDiv.appendChild(h3);
 
             const gridDiv = document.createElement('div');
             gridDiv.className = 'buttons-grid';
-            columns[key].elements.forEach(el => gridDiv.appendChild(el));
+            colData.elements.forEach(el => gridDiv.appendChild(el));
 
             colDiv.appendChild(gridDiv);
             container.appendChild(colDiv);
         }
+    });
+
+    const prevBtn = document.getElementById('btn-col-prev');
+    const nextBtn = document.getElementById('btn-col-next');
+
+    if (visibleCols > 5) {
+        container.classList.add('has-many-cols');
+        if (prevBtn) prevBtn.style.display = 'flex';
+        if (nextBtn) nextBtn.style.display = 'flex';
+        updateColNavButtons();
+    } else {
+        container.classList.remove('has-many-cols');
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
     }
+
     if (window.lucide) lucide.createIcons();
 }
 
@@ -313,9 +527,10 @@ function renderServices() {
 
     services.forEach(srv => {
         const isSelected = selectedService && selectedService.id === srv.id ? 'selected' : '';
+        const safeCat = 'cat-' + (selectedHost.tipo || 'application').replace(/[^a-zA-Z0-9_-]/g, '_');
         const srvHtml = `
             <div class="item-wrapper">
-                <button class="service-btn cat-${selectedHost.tipo} ${isSelected}" onclick="seleccionarService('${srv.id}')">
+                <button class="service-btn ${safeCat} ${isSelected}" onclick="seleccionarService('${srv.id}')">
                     ${srv.nombre} (${srv.puerto})
                 </button>
             </div>
@@ -458,8 +673,27 @@ window.addHostServiceRow = function (nombre = '', puerto = '', protocolo = 'http
     if (window.lucide) lucide.createIcons();
 }
 
+function populateHostTypeSelect() {
+    const select = document.getElementById('host-type');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '';
+    (state.tipos || []).forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.nombre;
+        select.appendChild(opt);
+    });
+    if (currentVal && state.tipos.some(t => t.id === currentVal)) {
+        select.value = currentVal;
+    } else if (state.tipos && state.tipos.length > 0) {
+        select.value = state.tipos[0].id;
+    }
+}
+
 // Hosts CRUD
 document.getElementById('btn-add-host').addEventListener('click', () => {
+    populateHostTypeSelect();
     document.getElementById('form-host').reset();
     document.getElementById('host-id').value = "";
     document.getElementById('host-use-domain').checked = false;
@@ -487,7 +721,7 @@ window.editarHost = function (hostId) {
         window.addHostServiceRow('WEB', '443', 'https');
     }
 
-    // Seleccionar tipo de forma segura, o agregar la opcion dinamicamente si no existe
+    populateHostTypeSelect();
     let select = document.getElementById('host-type');
     let exists = Array.from(select.options).some(o => o.value === host.tipo);
     if (!exists) {
@@ -500,7 +734,7 @@ window.editarHost = function (hostId) {
 
     document.getElementById('modal-host-title').textContent = "Editar Host";
     document.getElementById('modal-host').classList.add('active');
-}
+};
 
 window.borrarHost = function (hostId) {
     if (confirm('¿Estás seguro de que quieres borrar este host?')) {
@@ -698,7 +932,9 @@ document.getElementById('input-import').addEventListener('change', (e) => {
                 selectedHost = null;
                 selectedService = null;
                 actualizarUrl();
+                applyDynamicTipoStyles();
                 populateNetworkSelects();
+                populateHostTypeSelect();
                 renderActiveNetworkSelect();
                 updateHeaderDomain();
                 renderHosts();
@@ -718,7 +954,7 @@ document.getElementById('input-import').addEventListener('change', (e) => {
 
 // Settings
 document.getElementById('btn-settings').addEventListener('click', () => {
-    renderNetworks();
+    switchSettingsTab('redes');
     document.getElementById('modal-settings').classList.add('active');
 });
 
@@ -734,7 +970,33 @@ function updateHeaderDomain() {
     }
 }
 
+// Column navigation arrows
+const colContainer = document.getElementById('hosts-container');
+colContainer?.addEventListener('scroll', updateColNavButtons);
 
+document.getElementById('btn-col-prev')?.addEventListener('click', () => {
+    const col = colContainer.querySelector('.column');
+    const step = col ? col.offsetWidth + 20 : 250;
+    colContainer.scrollBy({ left: -step, behavior: 'smooth' });
+});
+
+document.getElementById('btn-col-next')?.addEventListener('click', () => {
+    const col = colContainer.querySelector('.column');
+    const step = col ? col.offsetWidth + 20 : 250;
+    colContainer.scrollBy({ left: step, behavior: 'smooth' });
+});
+
+document.getElementById('btn-col-prev')?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    startAutoScroll(-1);
+});
+document.getElementById('btn-col-prev')?.addEventListener('dragleave', stopAutoScroll);
+
+document.getElementById('btn-col-next')?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    startAutoScroll(1);
+});
+document.getElementById('btn-col-next')?.addEventListener('dragleave', stopAutoScroll);
 
 // Theme Setup
 function applyTheme() {
@@ -758,6 +1020,7 @@ document.getElementById('btn-theme-toggle').addEventListener('click', () => {
 loadData();
 applyTheme();
 populateNetworkSelects();
+populateHostTypeSelect();
 renderActiveNetworkSelect();
 updateHeaderDomain();
 renderHosts();
@@ -801,6 +1064,226 @@ function renderNetworks() {
     });
     if (window.lucide) lucide.createIcons();
 }
+
+window.switchSettingsTab = function (tabName) {
+    const isNetworks = tabName === 'redes';
+    const btnNet = document.getElementById('btn-tab-networks');
+    const btnTip = document.getElementById('btn-tab-types');
+    const tabNet = document.getElementById('tab-networks');
+    const tabTip = document.getElementById('tab-types');
+
+    if (btnNet) btnNet.classList.toggle('active', isNetworks);
+    if (btnTip) btnTip.classList.toggle('active', !isNetworks);
+    if (tabNet) tabNet.style.display = isNetworks ? 'block' : 'none';
+    if (tabTip) tabTip.style.display = isNetworks ? 'none' : 'block';
+
+    if (isNetworks) {
+        renderNetworks();
+    } else {
+        renderTipos();
+    }
+    if (window.lucide) lucide.createIcons();
+};
+
+let draggedTipoSettingIndex = null;
+
+function renderTipos() {
+    const container = document.getElementById('tipos-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.tipos) state.tipos = [];
+
+    state.tipos.forEach((tipo, index) => {
+        const card = document.createElement('div');
+        card.className = 'tipo-item-card';
+        card.setAttribute('draggable', 'true');
+
+        const hostCount = (state.hosts || []).filter(h => h.tipo === tipo.id).length;
+
+        card.innerHTML = `
+            <div class="tipo-info">
+                <div class="drag-handle" style="cursor:grab; display:flex; align-items:center; color:var(--secondary);" title="Arrastrar para reordenar"><i data-lucide="grip-vertical" class="icon-sm"></i></div>
+                <div class="tipo-color-badge" style="background-color: ${tipo.color};"></div>
+                <div>
+                    <strong style="display:block; font-size:14px;">${tipo.nombre}</strong>
+                    <small style="color:gray;">${tipo.color} • ${hostCount} host${hostCount === 1 ? '' : 's'}</small>
+                </div>
+            </div>
+            <div class="tipo-actions">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="moveTipo(${index}, -1)" ${index === 0 ? 'disabled' : ''} title="Subir"><i data-lucide="chevron-up" class="icon-sm"></i></button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="moveTipo(${index}, 1)" ${index === state.tipos.length - 1 ? 'disabled' : ''} title="Bajar"><i data-lucide="chevron-down" class="icon-sm"></i></button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openTipoForm('${tipo.id}')" title="Editar"><i data-lucide="pencil" class="icon-sm"></i></button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="borrarTipo('${tipo.id}')" title="Eliminar"><i data-lucide="trash-2" class="icon-sm"></i></button>
+            </div>
+        `;
+
+        card.addEventListener('dragstart', (e) => {
+            draggedTipoSettingIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => card.classList.add('dragging'), 0);
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            draggedTipoSettingIndex = null;
+            renderTipos();
+        });
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        card.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            if (draggedTipoSettingIndex !== null && index !== draggedTipoSettingIndex) {
+                card.style.borderTop = "3px dashed var(--primary)";
+            }
+        });
+        card.addEventListener('dragleave', () => {
+            card.style.borderTop = "";
+        });
+        card.addEventListener('drop', (e) => {
+            e.preventDefault();
+            card.style.borderTop = "";
+            if (draggedTipoSettingIndex !== null && draggedTipoSettingIndex !== index) {
+                const item = state.tipos.splice(draggedTipoSettingIndex, 1)[0];
+                state.tipos.splice(index, 0, item);
+                saveData();
+                renderTipos();
+                renderHosts();
+                populateHostTypeSelect();
+            }
+        });
+
+        container.appendChild(card);
+    });
+
+    if (window.lucide) lucide.createIcons();
+}
+
+window.moveTipo = function (index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= state.tipos.length) return;
+    const item = state.tipos.splice(index, 1)[0];
+    state.tipos.splice(newIndex, 0, item);
+    saveData();
+    renderTipos();
+    renderHosts();
+    populateHostTypeSelect();
+};
+
+window.openTipoForm = function (id = null) {
+    const form = document.getElementById('form-tipo');
+    form.reset();
+    initColorPresets();
+
+    if (id) {
+        const tipo = state.tipos.find(t => t.id === id);
+        if (!tipo) return;
+        document.getElementById('tipo-id').value = tipo.id;
+        document.getElementById('tipo-name').value = tipo.nombre;
+        document.getElementById('tipo-color').value = tipo.color;
+        document.getElementById('tipo-color-hex').value = tipo.color;
+        document.getElementById('modal-tipo-title').textContent = 'Editar Tipo';
+    } else {
+        document.getElementById('tipo-id').value = '';
+        document.getElementById('tipo-color').value = '#007bff';
+        document.getElementById('tipo-color-hex').value = '#007bff';
+        document.getElementById('modal-tipo-title').textContent = 'Añadir Tipo';
+    }
+
+    document.getElementById('modal-tipo-form').classList.add('active');
+};
+
+function initColorPresets() {
+    const container = document.getElementById('tipo-color-presets');
+    if (!container) return;
+    container.innerHTML = '';
+    COLOR_PRESETS.forEach(hex => {
+        const dot = document.createElement('div');
+        dot.className = 'color-preset-dot';
+        dot.style.backgroundColor = hex;
+        dot.title = hex;
+        dot.onclick = () => {
+            document.getElementById('tipo-color').value = hex;
+            document.getElementById('tipo-color-hex').value = hex;
+        };
+        container.appendChild(dot);
+    });
+}
+
+document.getElementById('tipo-color')?.addEventListener('input', (e) => {
+    document.getElementById('tipo-color-hex').value = e.target.value.toLowerCase();
+});
+
+document.getElementById('tipo-color-hex')?.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        document.getElementById('tipo-color').value = val;
+    }
+});
+
+document.getElementById('form-tipo')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = document.getElementById('tipo-id').value;
+    const nombre = document.getElementById('tipo-name').value.trim();
+    let color = document.getElementById('tipo-color-hex').value.trim().toLowerCase();
+
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        color = document.getElementById('tipo-color').value;
+    }
+
+    if (!nombre) return;
+
+    if (id) {
+        const tipo = state.tipos.find(t => t.id === id);
+        if (tipo) {
+            tipo.nombre = nombre;
+            tipo.color = color;
+        }
+    } else {
+        const newId = 'tipo_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+        state.tipos.push({ id: newId, nombre, color });
+    }
+
+    saveData();
+    applyDynamicTipoStyles();
+    populateHostTypeSelect();
+    closeModal('modal-tipo-form');
+    renderTipos();
+    renderHosts();
+    if (selectedHost) {
+        renderServices();
+    }
+});
+
+window.borrarTipo = function (id) {
+    if (state.tipos.length <= 1) {
+        alert("Debe haber al menos un tipo de host configurado.");
+        return;
+    }
+
+    const tipoToDelete = state.tipos.find(t => t.id === id);
+    if (!tipoToDelete) return;
+
+    const affectedHosts = (state.hosts || []).filter(h => h.tipo === id);
+    const fallbackTipo = state.tipos.find(t => t.id !== id);
+
+    if (affectedHosts.length > 0) {
+        const confirmMsg = `Hay ${affectedHosts.length} host(s) asignados al tipo "${tipoToDelete.nombre}".\n\nSi eliminas este tipo, estos hosts pasarán automáticamente al tipo "${fallbackTipo.nombre}".\n\n¿Deseas continuar?`;
+        if (!confirm(confirmMsg)) return;
+        affectedHosts.forEach(h => h.tipo = fallbackTipo.id);
+    } else {
+        if (!confirm(`¿Estás seguro de eliminar el tipo "${tipoToDelete.nombre}"?`)) return;
+    }
+
+    state.tipos = state.tipos.filter(t => t.id !== id);
+    saveData();
+    applyDynamicTipoStyles();
+    populateHostTypeSelect();
+    renderTipos();
+    renderHosts();
+    if (selectedHost) renderServices();
+};
 
 window.openNetworkForm = function () {
     document.getElementById('form-network').reset();
@@ -959,8 +1442,8 @@ function applyActiveNetworkState() {
 
 // ── Update Check ─────────────────────────────────────────────────────────────
 function parseVersion(v) {
-    // Elimina prefijos como "v" (ej: "v2.3" → [2,3])
-    return String(v).replace(/^v/i, '').split('.').map(Number);
+    // Elimina prefijos como "v" o "release" (ej: "v2.3", "release2.4" → [2,4])
+    return String(v).replace(/^[^\d]*/, '').split('.').map(Number);
 }
 
 function isNewer(remote, local) {

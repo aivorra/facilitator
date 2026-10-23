@@ -163,11 +163,58 @@ h2 { margin: 0; font-weight: 600; color: #1a202c; }
     font-size: 14px;
 }
 
+.columns-carousel-wrapper {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    gap: 8px;
+}
+
 .columns-container {
+    flex: 1;
     display: flex;
     gap: 20px;
     overflow-x: auto;
+    scroll-behavior: smooth;
     padding-bottom: 10px;
+    scrollbar-width: none; /* Firefox */
+}
+.columns-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+}
+
+/* When more than 5 columns exist, size them so exactly 5 fit in visible area */
+.columns-container.has-many-cols .column {
+    flex: 0 0 calc((100% - (4 * 20px)) / 5);
+    min-width: 210px;
+}
+
+.col-nav-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-color);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.col-nav-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+.col-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
 }
 
 .column {
@@ -177,6 +224,28 @@ h2 { margin: 0; font-weight: 600; color: #1a202c; }
     padding: 15px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+    transition: transform 0.15s, opacity 0.15s;
+}
+
+.column.dragging-col {
+    opacity: 0.45;
+    transform: scale(0.98);
+}
+
+.col-drag-handle {
+    cursor: grab;
+    display: none;
+    align-items: center;
+    color: var(--secondary);
+    transition: color 0.15s;
+}
+
+.col-drag-handle:hover {
+    color: var(--primary);
+}
+
+body.edit-mode .col-drag-handle {
+    display: inline-flex;
 }
 
 .column h3 {
@@ -428,3 +497,114 @@ body.dark-mode .form-group label { color: #94a3b8; }
 body.dark-mode .btn-action { background: #334155; color: #e2e8f0; }
 body.dark-mode .btn-action:hover { background: #475569; }
 body.dark-mode .btn-action.delete:hover { background: #7f1d1d; color: #fca5a5; }
+
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.settings-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.settings-tab-btn:hover {
+    color: var(--primary);
+}
+
+.settings-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+/* Tipos Management in Settings */
+.tipo-item-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary, #f8fafc);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.tipo-item-card.dragging {
+    opacity: 0.5;
+}
+
+.tipo-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tipo-color-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+}
+
+.tipo-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.color-preset-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.color-preset-dot:hover {
+    transform: scale(1.15);
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+body.dark-mode .col-nav-btn {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+body.dark-mode .col-nav-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+}
+
+body.dark-mode .tipo-item-card {
+    background: #1e293b;
+    border-color: #334155;
+}
