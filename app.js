@@ -649,8 +649,28 @@ document.getElementById('btn-toggle-edit').addEventListener('click', () => {
 
 // Modal Logic
 window.closeModal = function (id) {
-    document.getElementById(id).classList.remove('active');
-}
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('active');
+    }
+};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const activeModals = document.querySelectorAll('.modal.active');
+        if (activeModals.length > 0) {
+            e.preventDefault();
+            // Close the top-most modal
+            const topModal = activeModals[activeModals.length - 1];
+            closeModal(topModal.id);
+            if (topModal.id === 'modal-services-selection') {
+                window.selectedService = null;
+                actualizarUrl();
+                renderHosts();
+            }
+        }
+    }
+});
 
 window.addHostServiceRow = function (nombre = '', puerto = '', protocolo = 'https') {
     const container = document.getElementById('host-services-container');
